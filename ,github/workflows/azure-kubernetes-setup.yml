@@ -1,0 +1,81 @@
+name: CI/CD Pipeline
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * *'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Log in to ACR
+      run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ secrets.ENVIRONMENT }}surgeacrregistry.azurecr.io -u "${{ secrets.ACR_USERNAME }}" --password-stdin
+
+    - name: Build and Push Docker image
+      run: |
+        docker build -t myapp:latest .
+        docker tag myapp:latest ${{ secrets.ENVIRONMENT }}surgeacrregistry.azurecr.io/devsurge:latest
+        docker push ${{ secrets.ENVIRONMENT }}surgeacrregistry.azurecr.io/devsurge:latest
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v1
+
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ./terraform
+
+    - name: Terraform Plan
+      run: terraform plan -out=tfplan
+      working-directory: ./terraform
+      env:
+        TF_VAR_resource_group_name: ${{ secrets.RESOURCE_GROUP_NAME }}
+        TF_VAR_location: ${{ secrets.LOCATION }}
+        TF_VAR_environment: ${{ secrets.ENVIRONMENT }}
+        TF_VAR_monitoring_sku: ${{ secrets.MONITORING_SKU }}
+        TF_VAR_default_node_pool_vm_size: ${{ secrets.DEFAULT_NODE_POOL_VM_SIZE }}
+        TF_VAR_backend_resource_group_name: ${{ secrets.BACKEND_RESOURCE_GROUP_NAME }}
+        TF_VAR_backend_storage_account_name: ${{ secrets.BACKEND_STORAGE_ACCOUNT_NAME }}
+        TF_VAR_backend_container_name: ${{ secrets.BACKEND_CONTAINER_NAME }}
+
+    - name: Terraform Apply
+      run: terraform apply -auto-approve tfplan
+      working-directory: ./terraform
+      env:
+        TF_VAR_resource_group_name: ${{ secrets.RESOURCE_GROUP_NAME }}
+        TF_VAR_location: ${{ secrets.LOCATION }}
+        TF_VAR_environment: ${{ secrets.ENVIRONMENT }}
+        TF_VAR_monitoring_sku: ${{ secrets.MONITORING_SKU }}
+        TF_VAR_default_node_pool_vm_size: ${{ secrets.DEFAULT_NODE_POOL_VM_SIZE }}
+        TF_VAR_backend_resource_group_name: ${{ secrets.BACKEND_RESOURCE_GROUP_NAME }}
+        TF_VAR_backend_storage_account_name: ${{ secrets.BACKEND_STORAGE_ACCOUNT_NAME }}
+        TF_VAR_backend_container_name: ${{ secrets.BACKEND_CONTAINER_NAME }}
+
+    - name: Set up Kubernetes
+      uses: azure/setup-kubectl@v1
+
+    - name: Deploy to AKS
+      run: |
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
+        kubectl apply -f k8s/configmap.yaml
+        kubectl apply -f k8s/ingress.yaml
+        kubectl apply -f k8s/secrets.yaml
+        kubectl apply -f hpa.yaml
+        kubectl apply -f serviceaccount.yaml
+        kubectl apply -f role.yaml
+        kubectl apply -f rolebinding.yaml
+
+    - name: Clean up evicted pods
+      run: ./scripts/cleanup.sh

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: surge-dev-deployment
+  namespace: surge-dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: surge-dev
+  template:
+    metadata:
+      labels:
+        app: surge-dev
+    spec:
+      serviceAccountName: surge-dev-sa
+      containers:
+      - name: surge-dev
+        image: devsurgeacrregistry.azurecr.io/surge-dev:latest
+        ports:
+        - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: surge-dev-config
+        - secretRef:
+            name: surge-dev-secrets
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
