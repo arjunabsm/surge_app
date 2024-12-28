@@ -1,0 +1,5 @@
+environment = "stg"
+location = "East US"
+backend_resource_group_name = "stg_backend_storage_account_rg"
+backend_storage_account_name = "stg_backend_storage_account_name"
+backend_container_name = "stg_backend_storage_account_container"

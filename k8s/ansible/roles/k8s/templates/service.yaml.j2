@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: surge-{{ lookup('env', 'environment') }}-service
+  namespace: surge-{{ lookup('env', 'environment') }}
+spec:
+  selector:
+    app: surge-{{ lookup('env', 'environment') }}
+  ports:
+    - protocol: {{ lookup('env', 'protocol') }}
+      port: {{ lookup('env', 'service_port') }}
+      targetPort: {{ lookup('env', 'service_target_port') }}
+  type: LoadBalancer

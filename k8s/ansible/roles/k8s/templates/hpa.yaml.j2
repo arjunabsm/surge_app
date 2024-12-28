@@ -1,0 +1,25 @@
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: surge-{{ lookup('env', 'environment') }}-hpa
+  namespace: surge-{{ lookup('env', 'environment') }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: surge-{{ lookup('env', 'environment') }}-deployment
+  minReplicas: {{ lookup('env', 'minReplicas') }}
+  maxReplicas: {{ lookup('env', 'maxReplicas') }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ lookup('env', 'cpu_averageUtilization') }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ lookup('env', 'memory_averageUtilization') }}

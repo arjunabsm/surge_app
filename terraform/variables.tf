@@ -24,3 +24,7 @@ variable "environment" {
   type        = string
   default     = "dev"  
 }
+variable "acr_sku" {
+  description = "The SKU of the Azure Container Registry"
+  type        = string
+}

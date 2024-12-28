@@ -1,3 +1,11 @@
+output "aks_cluster_name" {
+  value = module.aks.cluster_name
+}
+
+output "aks_cluster_kubeconfig" {
+  value = module.aks.kubeconfig
+}
+
 output "acr_login_server" {
   value = module.acr.acr_login_server
 }

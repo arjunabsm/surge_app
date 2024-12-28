@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ lookup('env', 'config_name') }}"
+  namespace: "{{ lookup('env', 'namespace') }}"
+data:
+  APP_SETTING: "{{ lookup('env', 'app_setting') }}"
