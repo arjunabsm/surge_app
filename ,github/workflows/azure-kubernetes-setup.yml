@@ -8,14 +8,20 @@ on:
 
 jobs:
   build:
-    runs-on: custom_ubuntu-latest
+    runs-on: custom_ubuntu-${{ secrets[matrix.environment + '_surge_app_tag'] }}
     strategy:
       matrix:
-        environment: [dev, staging, prod]
+        environment: [dev, stg, prd]
 
     steps:
-      - name: Checkout code
+      - name: Checkout infrastructure code
         uses: actions/checkout@v2
+
+      - name: Checkout web application code
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets[matrix.environment + '_github_service_account_name'] }}/${{ secrets[matrix.environment + '_github_repo_url'] }}
+          path: web-app
 
       - name: Login to Azure
         uses: azure/login@v1
@@ -30,9 +36,9 @@ jobs:
 
       - name: Build and Push Docker image
         run: |
-          docker build -t ${{ matrix.environment }}-surge${{ matrix.environment }}:latest .
-          docker tag ${{ matrix.environment }}-surge${{ matrix.environment }}:latest ${{ matrix.environment }}surgeacrregistry.azurecr.io/${{ matrix.environment }}-surgedev:latest
-          docker push ${{ matrix.environment }}surgeacrregistry.azurecr.io/${{ matrix.environment }}-surge${{ matrix.environment }}:latest
+          docker build -t ${{ matrix.environment }}-web-app-surge${{ matrix.environment }}:${{ secrets[matrix.environment + '_web_app_tag'] }} ./web-app
+          docker tag ${{ matrix.environment }}--web-app-surge${{ matrix.environment }}:${{ secrets[matrix.environment + '_web_app_tag'] }} ${{ matrix.environment }}surgeacrregistry.azurecr.io/${{ matrix.environment }}--web-app-surge${{ matrix.environment }}:${{ secrets[matrix.environment + '_web_app_tag'] }}
+          docker push ${{ matrix.environment }}surgeacrregistry.azurecr.io/${{ matrix.environment }}--web-app-surge${{ matrix.environment }}:${{ secrets[matrix.environment + '_web_app_tag'] }}
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
@@ -88,7 +94,7 @@ jobs:
 
       - name: Deploy to AKS
         run: |
-          ansible-playbook -i localhost k8s/deploy.yaml
+          ansible-playbook -i localhost k8s/ansible/playbooks/deploy-k8s.yml
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
           kubectl apply -f k8s/configmap.yaml
@@ -121,7 +127,8 @@ jobs:
           keyvault_name: ${{ secrets[matrix.environment + '_KEYVAULT_NAME'] }}
           tenant_id: ${{ secrets[matrix.environment + '_TENANT_ID'] }}
           http_path: ${{ secrets[matrix.environment + '_HTTP_PATH'] }}  
-          environment: ${{ matrix.environment }}        
+          environment: ${{ matrix.environment }}
+          web_app_tag: ${{ secrets[matrix.environment + '_web_app_tag'] }}
 
       - name: Clean up evicted pods
         run: ./scripts/cleanup.sh

@@ -16,7 +16,7 @@ spec:
       serviceAccountName: surge-{{ lookup('env', 'environment') }}-sa
       containers:
       - name: surge-{{ lookup('env', 'environment') }}
-        image: surge{{ lookup('env', 'environment') }}acrregistry.azurecr.io/surge-{{ lookup('env', 'environment') }}:latest
+        image: {{ lookup('env', 'environment') }}surgeacrregistry.azurecr.io/{{ lookup('env', 'environment') }}--web-app-surge{{ lookup('env', 'environment') }}:{{ lookup('env', 'web_app_tag') }}
         ports:
         - containerPort: {{ lookup('env', 'containerPort') }}
         env:

@@ -1,4 +1,5 @@
-- hosts: localhost
+- name: Deploy Kubernetes resource configurations
+  hosts: localhost
   tasks:
     - name: Generate Kubernetes manifests
       template:
@@ -19,11 +20,6 @@
       template:
         src: roles/k8s/templates/ingress.yaml.j2
         dest: ../../ingress.yaml
-      delegate_to: localhost
-    - name: Generate Kubernetes secret
-      template:
-        src: roles/k8s/templates/secret.yaml.j2
-        dest: ../../secret.yaml
       delegate_to: localhost
     - name: Generate Kubernetes namespace
       template:
