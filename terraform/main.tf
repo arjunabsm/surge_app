@@ -28,6 +28,7 @@ module "network" {
   source              = "./modules/network"
   resource_group_name = module.resource_group.resource_group_name
   environment         = var.environment
+  network_security_rule = var.network_security_rule
 }
 
 module "aks" {
