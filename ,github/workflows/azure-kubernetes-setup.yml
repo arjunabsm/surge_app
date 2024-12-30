@@ -5,77 +5,130 @@ on:
       - main
   schedule:
     - cron: '0 0 * * *'
+
 jobs:
   build:
-    runs-on: ubuntu-latest
-steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+    runs-on: custom_ubuntu-${{ secrets[matrix.environment + '_surge_app_tag'] }}
+    strategy:
+      matrix:
+        environment: [dev, stg, prd]
 
-    - name: Login to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    steps:
+      - name: Checkout infrastructure code
+        uses: actions/checkout@v2
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      - name: Checkout web application code
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets[matrix.environment + '_github_service_account_name'] }}/${{ secrets[matrix.environment + '_github_repo_url'] }}
+          path: web-app
 
-    - name: Log in to ACR
-      run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ secrets.ENVIRONMENT }}surgeacrregistry.azurecr.io -u "${{ secrets.ACR_USERNAME }}" --password-stdin
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets[matrix.environment + '_AZURE_CREDENTIALS'] }}
 
-    - name: Build and Push Docker image
-      run: |
-        docker build -t myapp:latest .
-        docker tag myapp:latest ${{ secrets.ENVIRONMENT }}surgeacrregistry.azurecr.io/devsurge:latest
-        docker push ${{ secrets.ENVIRONMENT }}surgeacrregistry.azurecr.io/devsurge:latest
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
 
-    - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v1
+      - name: Log in to ACR
+        run: echo "${{ secrets[matrix.environment + '_ACR_PASSWORD'] }}" | docker login ${{ matrix.environment }}surgeacrregistry.azurecr.io -u "${{ secrets[matrix.environment + '_ACR_USERNAME'] }}" --password-stdin
 
-    - name: Terraform Init
-      run: terraform init
-      working-directory: ./terraform
+      - name: Build and Push Docker image
+        run: |
+          docker build -t ${{ matrix.environment }}-web-app-surge${{ matrix.environment }}:${{ secrets[matrix.environment + '_web_app_tag'] }} ./web-app
+          docker tag ${{ matrix.environment }}--web-app-surge${{ matrix.environment }}:${{ secrets[matrix.environment + '_web_app_tag'] }} ${{ matrix.environment }}surgeacrregistry.azurecr.io/${{ matrix.environment }}--web-app-surge${{ matrix.environment }}:${{ secrets[matrix.environment + '_web_app_tag'] }}
+          docker push ${{ matrix.environment }}surgeacrregistry.azurecr.io/${{ matrix.environment }}--web-app-surge${{ matrix.environment }}:${{ secrets[matrix.environment + '_web_app_tag'] }}
 
-    - name: Terraform Plan
-      run: terraform plan -out=tfplan
-      working-directory: ./terraform
-      env:
-        TF_VAR_resource_group_name: ${{ secrets.RESOURCE_GROUP_NAME }}
-        TF_VAR_location: ${{ secrets.LOCATION }}
-        TF_VAR_environment: ${{ secrets.ENVIRONMENT }}
-        TF_VAR_monitoring_sku: ${{ secrets.MONITORING_SKU }}
-        TF_VAR_default_node_pool_vm_size: ${{ secrets.DEFAULT_NODE_POOL_VM_SIZE }}
-        TF_VAR_backend_resource_group_name: ${{ secrets.BACKEND_RESOURCE_GROUP_NAME }}
-        TF_VAR_backend_storage_account_name: ${{ secrets.BACKEND_STORAGE_ACCOUNT_NAME }}
-        TF_VAR_backend_container_name: ${{ secrets.BACKEND_CONTAINER_NAME }}
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
 
-    - name: Terraform Apply
-      run: terraform apply -auto-approve tfplan
-      working-directory: ./terraform
-      env:
-        TF_VAR_resource_group_name: ${{ secrets.RESOURCE_GROUP_NAME }}
-        TF_VAR_location: ${{ secrets.LOCATION }}
-        TF_VAR_environment: ${{ secrets.ENVIRONMENT }}
-        TF_VAR_monitoring_sku: ${{ secrets.MONITORING_SKU }}
-        TF_VAR_default_node_pool_vm_size: ${{ secrets.DEFAULT_NODE_POOL_VM_SIZE }}
-        TF_VAR_backend_resource_group_name: ${{ secrets.BACKEND_RESOURCE_GROUP_NAME }}
-        TF_VAR_backend_storage_account_name: ${{ secrets.BACKEND_STORAGE_ACCOUNT_NAME }}
-        TF_VAR_backend_container_name: ${{ secrets.BACKEND_CONTAINER_NAME }}
+      - name: Terraform Init
+        run: terraform init -backend-config="resource_group_name=${{ secrets[matrix.environment + '_BACKEND_RESOURCE_GROUP_NAME'] }}" -backend-config="storage_account_name=${{ secrets[matrix.environment + '_BACKEND_STORAGE_ACCOUNT_NAME'] }}" -backend-config="container_name=${{ secrets[matrix.environment + '_BACKEND_CONTAINER_NAME'] }}"
+        working-directory: ./terraform
 
-    - name: Set up Kubernetes
-      uses: azure/setup-kubectl@v1
+      - name: Terraform Plan
+        run: terraform plan -var-file=environment/${{ matrix.environment }}/terraform.tfvars -out=tfplan
+        working-directory: ./terraform
+        env:
+          TF_VAR_resource_group_name: ${{ secrets[matrix.environment + '_RESOURCE_GROUP_NAME'] }}
+          TF_VAR_location: ${{ secrets[matrix.environment + '_LOCATION'] }}
+          TF_VAR_environment: ${{ matrix.environment }}
+          TF_VAR_monitoring_sku: ${{ secrets[matrix.environment + '_MONITORING_SKU'] }}
+          TF_VAR_default_node_pool_vm_size: ${{ secrets[matrix.environment + '_DEFAULT_NODE_POOL_VM_SIZE'] }}
+          TF_VAR_backend_resource_group_name: ${{ secrets[matrix.environment + '_BACKEND_RESOURCE_GROUP_NAME'] }}
+          TF_VAR_backend_storage_account_name: ${{ secrets[matrix.environment + '_BACKEND_STORAGE_ACCOUNT_NAME'] }}
+          TF_VAR_backend_container_name: ${{ secrets[matrix.environment + '_BACKEND_CONTAINER_NAME'] }}
 
-    - name: Deploy to AKS
-      run: |
-        kubectl apply -f k8s/deployment.yaml
-        kubectl apply -f k8s/service.yaml
-        kubectl apply -f k8s/configmap.yaml
-        kubectl apply -f k8s/ingress.yaml
-        kubectl apply -f k8s/secrets.yaml
-        kubectl apply -f hpa.yaml
-        kubectl apply -f serviceaccount.yaml
-        kubectl apply -f role.yaml
-        kubectl apply -f rolebinding.yaml
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -var-file=environment/${{ matrix.environment }}/terraform.tfvars tfplan
+        working-directory: ./terraform
+        env:
+          TF_VAR_resource_group_name: ${{ secrets[matrix.environment + '_RESOURCE_GROUP_NAME'] }}
+          TF_VAR_location: ${{ secrets[matrix.environment + '_LOCATION'] }}
+          TF_VAR_environment: ${{ matrix.environment }}
+          TF_VAR_monitoring_sku: ${{ secrets[matrix.environment + '_MONITORING_SKU'] }}
+          TF_VAR_default_node_pool_vm_size: ${{ secrets[matrix.environment + '_DEFAULT_NODE_POOL_VM_SIZE'] }}
+          TF_VAR_backend_resource_group_name: ${{ secrets[matrix.environment + '_BACKEND_RESOURCE_GROUP_NAME'] }}
+          TF_VAR_backend_storage_account_name: ${{ secrets[matrix.environment + '_BACKEND_STORAGE_ACCOUNT_NAME'] }}
+          TF_VAR_backend_container_name: ${{ secrets[matrix.environment + '_BACKEND_CONTAINER_NAME'] }}
 
-    - name: Clean up evicted pods
-      run: ./scripts/cleanup.sh
+      - name: Set up Kubernetes
+        uses: azure/setup-kubectl@v1
+    
+    # - name: Deploy AGIC
+    #   run: |
+    #     helm repo add application-gateway-kubernetes-ingress https://appgwingress.blob.core.windows.net/ingress-azure-helm-package/
+    #     helm repo update
+    #     helm install ingress-azure application-gateway-kubernetes-ingress/ingress-azure \
+    #       --namespace kube-system \
+    #       --set appgw.name=${{ secrets.ENVIRONMENT }}surge-appgw \
+    #       --set appgw.resourceGroup=${{ secrets.RESOURCE_GROUP_NAME }} \
+    #       --set appgw.subscriptionId=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+    #       --set appgw.shared=false \
+    #       --set armAuth.type=aadPodIdentity \
+    #       --set armAuth.identityResourceID=${{ secrets.AZURE_IDENTITY_RESOURCE_ID }} \
+    #       --set armAuth.identityClientID=${{ secrets.AZURE_IDENTITY_CLIENT_ID }} \
+    #       --set rbac.enabled=true \
+    #       --set verbosityLevel=3
+
+      - name: Deploy to AKS
+        run: |
+          ansible-playbook -i localhost k8s/ansible/playbooks/deploy-k8s.yml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/ingress.yaml
+          kubectl apply -f k8s/secrets.yaml
+          kubectl apply -f hpa.yaml
+          kubectl apply -f serviceaccount.yaml
+          kubectl apply -f role.yaml
+          kubectl apply -f rolebinding.yaml
+        env:
+          config_name: ${{ secrets[matrix.environment + '_CONFIG_NAME'] }}
+          namespace: ${{ secrets[matrix.environment + '_NAMESPACE'] }}
+          app_setting: ${{ secrets[matrix.environment + '_APP_SETTING'] }}
+          config_name: ${{ secrets[matrix.environment + '_CONFIG_NAME'] }}
+          target_port: ${{ secrets[matrix.environment + '_TARGET_PORT'] }}
+          service_port: ${{ secrets[matrix.environment + '_SERVICE_PORT'] }}
+          protocol: ${{ secrets[matrix.environment + '_PROTOCOL'] }}
+          container_port: ${{ secrets[matrix.environment + '_CONTAINER_PORT'] }}
+          secret1_name: ${{ secrets[matrix.environment + '_SECRET1_NAME'] }}
+          secret2_name: ${{ secrets[matrix.environment + '_SECRET2_NAME'] }}
+          secret3_name: ${{ secrets[matrix.environment + '_SECRET3_NAME'] }}
+          resource_memory: ${{ secrets[matrix.environment + '_RESOURCE_MEMORY'] }}
+          resource_cpu: ${{ secrets[matrix.environment + '_RESOURCE_CPU'] }}
+          request_memory: ${{ secrets[matrix.environment + '_REQUEST_MEMORY'] }}
+          request_cpu: ${{ secrets[matrix.environment + '_REQUEST_CPU'] }}
+          minReplicas: ${{ secrets[matrix.environment + '_MIN_REPLICAS'] }}
+          maxReplicas: ${{ secrets[matrix.environment + '_MAX_REPLICAS'] }}
+          cpu_averageUtilization: ${{ secrets[matrix.environment + '_CPU_AVERAGE_UTILIZATION'] }}
+          memory_averageUtilization: ${{ secrets[matrix.environment + '_MEMORY_AVERAGE_UTILIZATION'] }}
+          keyvault_name: ${{ secrets[matrix.environment + '_KEYVAULT_NAME'] }}
+          tenant_id: ${{ secrets[matrix.environment + '_TENANT_ID'] }}
+          http_path: ${{ secrets[matrix.environment + '_HTTP_PATH'] }}  
+          environment: ${{ matrix.environment }}
+          web_app_tag: ${{ secrets[matrix.environment + '_web_app_tag'] }}
+
+      - name: Clean up evicted pods
+        run: ./scripts/cleanup.sh

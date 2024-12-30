@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: surge-{{ lookup('env', 'environment') }}-deployment
+  namespace: surge-{{ lookup('env', 'environment') }}
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: surge-{{ lookup('env', 'environment') }}
+  template:
+    metadata:
+      labels:
+        app: surge-{{ lookup('env', 'environment') }}
+    spec:
+      serviceAccountName: surge-{{ lookup('env', 'environment') }}-sa
+      containers:
+      - name: surge-{{ lookup('env', 'environment') }}
+        image: {{ lookup('env', 'environment') }}surgeacrregistry.azurecr.io/{{ lookup('env', 'environment') }}--web-app-surge{{ lookup('env', 'environment') }}:{{ lookup('env', 'web_app_tag') }}
+        ports:
+        - containerPort: {{ lookup('env', 'containerPort') }}
+        env:
+        - name: SECRET1_KEY
+          valueFrom:
+            secretKeyRef:
+              name: surge-{{ lookup('env', 'environment') }}-secrets
+              key: {{ lookup('env', 'secret1_name') }}
+        - name: SECRET2_KEY
+          valueFrom:
+            secretKeyRef:
+              name: surge-{{ lookup('env', 'environment') }}-secrets
+              key: {{ lookup('env', 'secret2_name') }}
+        - name: SECRET3_KEY
+          valueFrom:
+            secretKeyRef:
+              name: surge-{{ lookup('env', 'environment') }}-secrets
+              key: {{ lookup('env', 'secret3_name') }}
+        resources:
+          limits:
+            memory: {{ lookup('env', 'resource_memory') }}
+            cpu: {{ lookup('env', 'resource_cpu') }}
+          requests:
+            memory: {{ lookup('env', 'request_memory') }}
+            cpu: {{ lookup('env', 'request_cpu') }}
+      volumes:
+      - name: secrets-store-inline
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: "azure-kvname-secrets"

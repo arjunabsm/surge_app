@@ -1,0 +1,48 @@
+- name: Deploy Kubernetes resource configurations
+  hosts: localhost
+  tasks:
+    - name: Generate Kubernetes manifests
+      template:
+        src: roles/k8s/templates/deployment.yaml.j2
+        dest: ../../deployment.yaml
+      delegate_to: localhost
+    - name: Generate Kubernetes service
+      template:
+        src: roles/k8s/templates/service.yaml.j2
+        dest: ../../service.yaml
+      delegate_to: localhost
+    - name: Generate Kubernetes configmap
+      template:
+        src: roles/k8s/templates/configmap.yaml.j2
+        dest: ../../configmap.yaml
+      delegate_to: localhost
+    - name: Generate Kubernetes ingress
+      template:
+        src: roles/k8s/templates/ingress.yaml.j2
+        dest: ../../ingress.yaml
+      delegate_to: localhost
+    - name: Generate Kubernetes namespace
+      template:
+        src: roles/k8s/templates/namespace.yaml.j2
+        dest: ../../namespace.yaml
+      delegate_to: localhost
+    - name: Generate Kubernetes service account
+      template:
+        src: roles/k8s/templates/service-account.yaml.j2
+        dest: ../../service-account.yaml
+      delegate_to: localhost
+    - name: Generate Kubernetes role
+      template:
+        src: roles/k8s/templates/role.yaml.j2
+        dest: ../../role.yaml
+      delegate_to: localhost
+    - name: Generate Kubernetes role binding
+      template:
+        src: roles/k8s/templates/role-binding.yaml.j2
+        dest: ../../role-binding.yaml
+      delegate_to: localhost
+    - name: Generate Kubernetes HPA
+      template:
+        src: roles/k8s/templates/hpa.yaml.j2
+        dest: ../../hpa.yaml
+      delegate_to: localhost

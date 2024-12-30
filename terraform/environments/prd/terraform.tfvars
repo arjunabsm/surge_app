@@ -1,0 +1,5 @@
+environment = "prd"
+location = "East US"
+backend_resource_group_name = "prd_backend_storage_account_rg"
+backend_storage_account_name = "prd_backend_storage_account_name"
+backend_container_name = "prd_backend_storage_account_container"

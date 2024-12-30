@@ -2,14 +2,10 @@ provider "azurerm" {
   features {}
 }
 
-module "resource_group" {
-  source      = "./modules/resource_group"
-}
-
 resource "azurerm_storage_account" "storage" {
   name                     = "${var.environment}-app-sa"
-  resource_group_name      = module.resource_group.resource_group_name
-  location                 = module.resource_group.resource_group_location
+  resource_group_name      = var.resource_group_name
+  location                 = var.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
 }

@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: surge-{{ lookup('env', 'environment') }}-rolebinding
+  namespace: surge-{{ lookup('env', 'environment') }}
+subjects:
+- kind: ServiceAccount
+  name: surge-{{ lookup('env', 'environment') }}-svc-account
+  namespace: surge-{{ lookup('env', 'environment') }}
+roleRef:
+  kind: Role
+  name: surge-{{ lookup('env', 'environment') }}-role
+  apiGroup: rbac.authorization.k8s.io

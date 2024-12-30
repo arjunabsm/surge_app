@@ -1,8 +1,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: surge-dev
-  name: surge-dev-role
+  namespace: surge-{{ lookup('env', 'environment') }}
+  name: surge-{{ lookup('env', 'environment') }}-role
 rules:
 - apiGroups: [""]
   resources: ["pods", "services", "configmaps"]
